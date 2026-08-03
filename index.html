@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loket POS - Token Listrik (Prototype by Ipoel@2026)</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; background-color: #e8e8e8; display: flex; justify-content: center; padding-top: 20px; }
+        .container { width: 440px; background-color: #fff; padding: 10px 20px; box-sizing: border-box; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 8px; }
+        h2 { text-align: center; font-size: 18px; margin-bottom: 15px; margin-top: 5px; color: #333; }
+        fieldset { border: 1px solid #ccc; border-radius: 4px; padding: 10px; margin-bottom: 15px; background-color: #fafafa; }
+        legend { padding: 0 5px; font-size: 14px; font-weight: bold; color: #555; }
+        .flex-row { display: flex; gap: 10px; align-items: center; }
+        select, input[type="text"] { padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: 'Courier New', Courier, monospace; font-size: 13px; }
+        .btn-scan { background-color: #008CBA; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; font-weight: bold; font-family: 'Courier New', Courier, monospace; }
+        .btn-scan:hover { background-color: #007399; }
+        .form-grid { display: grid; grid-template-columns: 140px 1fr; gap: 10px 0; align-items: center; margin-bottom: 20px; }
+        .form-grid label { font-size: 14px; color: #444; font-weight: 600; }
+        .form-grid input, .form-grid select { width: 230px; }
+        .btn-cetak { width: 100%; background-color: #ff7300; color: white; border: none; padding: 12px; font-size: 16px; font-weight: bold; font-family: 'Courier New', Courier, monospace; cursor: pointer; border-radius: 4px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(255, 115, 0, 0.3); }
+        .btn-cetak:hover { background-color: #e66800; }
+        .btn-cetak:disabled { background-color: #ccc; cursor: not-allowed; box-shadow: none; }
+        
+        /* Modal Style */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background-color: #d1d5db; padding: 15px; border-radius: 8px; width: 480px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #bbb; }
+        .modal-header h3 { margin: 0; font-size: 16px; color: #333; }
+        .close-btn { background: #ff4c4c; color: white; border: none; font-size: 16px; font-weight: bold; cursor: pointer; width: 28px; height: 28px; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+        .close-btn:hover { background: #e60000; }
+        
+        /* Area Struk / Meja Kasir */
+        .struk-area { 
+            width: 100%; 
+            height: 500px; 
+            background-color: #d1d5db; 
+            overflow-y: auto; 
+            padding: 20px; 
+            box-sizing: border-box;
+            text-align: center; 
+            display: block; 
+        }
+        
+        /* Preview Canvas */
+        .struk-img-preview {
+            width: 100%; 
+            max-width: 400px;
+            height: auto !important; 
+            background-color: white;
+            box-shadow: -2px 2px 10px rgba(0,0,0,0.15);
+            border-top: 2px dashed #999;
+            border-bottom: 2px dashed #999;
+            display: block;
+            margin: 0 auto; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Cetak Struk POS - Token PLN</h2>
+
+    <fieldset>
+        <legend> Pengaturan Printer Bluetooth </legend>
+        <div class="flex-row">
+            <select id="combo_port" style="width: 230px;">
+                <option value="none">Pilih Printer...</option>
+            </select>
+            <button class="btn-scan" onclick="pindaiPrinter()">Pindai Printer</button>
+        </div>
+        <small style="color: red; display: none; margin-top: 5px;" id="statusPrinter">Status: Belum Terhubung</small>
+    </fieldset>
+
+    <div class="form-grid">
+        <label>Lokasi KPC:</label>
+        <select id="entry_kpc">
+            <option value="Kpc. Manokwari Sanggeng 98312A">Kpc. Manokwari Sanggeng 98312A</option>
+            <option value="Kpc Prafi 98356">Kpc Prafi 98356</option>
+        </select>
+
+        <label>No. Meter:</label>
+        <select id="entry_meter" onchange="autoFillDariMeter()">
+            <option value="">-- Pilih No. Meter --</option>
+            
+            <optgroup label="RUMDIN IFK">
+                <option value="14515307098">14515307098 (RUMDIN BALAI OBAT)</option>
+            </optgroup>
+            
+            <optgroup label="PUSKESMAS SANGGENG">
+                <option value="14516287100">14516287100 (PUSKESMAS)</option>
+            </optgroup>
+
+            <optgroup label="PUSKESMAS MANSINAM">
+                <option value="56253536546">56253536546 (PUSKESMAS MANSINAM)</option>
+            </optgroup>
+            
+            <optgroup label="PUSKESMAS PRAFI">
+                <option value="14510802540">14510802540 (PUSKESMAS)</option>
+                <option value="45044658750">45044658750 (PUSKESMAS)</option>
+                <option value="86252365746">86252365746 (PUSKESMAS PEMBANTU)</option>
+            </optgroup>
+            
+            <optgroup label="PUSKESMAS MASNI">
+                <option value="45020383704">45020383704 (PUSKESMAS MASNI)</option>
+                <option value="32902140311">32902140311 (PUSKESMAS)</option>
+                <option value="14328640900">14328640900 (G. PERTEMUAN PUSKESMAS)</option>
+                <option value="14508190809">14508190809 (PUSKESMAS SP 7)</option>
+            </optgroup>
+
+            <optgroup label="PUSKESMAS WOSI">
+                <option value="14431361311">14431361311 (RUANG OPERASI PUSKESMAS WOSI)</option>
+            </optgroup>
+
+            <optgroup label="PUSKESMAS MACUAN">
+                <option value="45040449238">45040449238 (DINAS KESEHATAN)</option>
+            </optgroup>
+
+            <optgroup label="PUSKESMAS TANAH RUBUH">
+                <option value="86258516391">86258516391 (PUSKESMAS WARKAPI)</option>
+            </optgroup>
+
+            <optgroup label="PUSKESMAS SIDEY">
+                <option value="86258533263">86258533263 (PUSKESMAS)</option>
+            </optgroup>
+
+            <optgroup label="PUSKESMAS WARMARE">
+                <option value="14550787098">14550787098 (PUSKESMAS WARMARE)</option>
+            </optgroup>
+            
+            <optgroup label="PUSKESMAS NUNI">
+                <option value="14516460566">14516460566 (PUSKESMAS)</option>
+            </optgroup>
+        </select>
+
+        <label>IDPEL:</label>
+        <input type="text" id="combo_idpel" value="">
+
+        <label>Nama Pelanggan:</label>
+        <input type="text" id="entry_nama" value="">
+
+        <label>Tarif / Daya:</label>
+        <select id="combo_daya">
+            <option value="R1/450 VA">R1/450 VA (Subsidi)</option>
+            <option value="R1/900 VA">R1/900 VA (Subsidi)</option>
+            <option value="R1M/900 VA">R1M/900 VA (Non-Subsidi)</option>
+            <option value="R1/1300 VA">R1/1300 VA</option>
+            <option value="R1/2200 VA">R1/2200 VA</option>
+            <option value="R2/3500 VA">R2/3500 VA</option>
+            <option value="S1/4400 VA">S1/4400 VA</option>
+            <option value="S1/5500 VA">S1/5500 VA</option>
+            <option value="S1/6600 VA">S1/6600 VA</option>
+            <option value="B1/450 VA">B1/450 VA</option>
+            <option value="B1/900 VA">B1/900 VA</option>
+            <option value="S1/1300 VA">S1/1300 VA</option>
+            <option value="P1/1300 VA">P1/1300 VA</option>
+            <option value="B1/2200 VA">B1/2200 VA</option>
+            <option value="S1/450 VA">S1/450 VA</option>
+            <option value="S1/900 VA">S1/900 VA</option>
+            <option value="S1/2200 VA">S1/2200 VA</option>
+            <option value="S1/3500 VA" selected>S1/3500 VA</option>
+        </select>
+
+        <label>RP STROOM:</label>
+        <select id="combo_nominal">
+            <option value="20000">20.000</option>
+            <option value="50000">50.000</option>
+            <option value="100000">100.000</option>
+            <option value="200000">200.000</option>
+            <option value="500000" selected>500.000</option>
+            <option value="1000000">1.000.000</option>
+            <option value="5000000">5.000.000</option>
+            <option value="10000000">10.000.000</option>
+            <option value="50000000">50.000.000</option>
+        </select>
+
+        <label>ADMIN POS:</label>
+        <select id="combo_admin">
+            <option value="2000" selected>Rp 2.000</option>
+            <option value="2500">Rp 2.500</option>
+            <option value="3500">Rp 3.500</option>
+        </select>
+
+        <!-- Dropdown Acak Bulan dan Tanggal -->
+        <label>Bulan (Acak):</label>
+        <select id="combo_bulan" onchange="updateTanggal(); setWaktuAcak();">
+            <option value="all">Otomatis (Bulan Berjalan)</option>
+            <option value="0">Januari</option>
+            <option value="1">Februari</option>
+            <option value="2">Maret</option>
+            <option value="3">April</option>
+            <option value="4">Mei</option>
+            <option value="5">Juni</option>
+            <option value="6">Juli</option>
+            <option value="7">Agustus</option>
+            <option value="8">September</option>
+            <option value="9">Oktober</option>
+            <option value="10">November</option>
+            <option value="11">Desember</option>
+        </select>
+
+        <label>Tanggal (Acak):</label>
+        <select id="combo_tanggal" onchange="setWaktuAcak()">
+            <option value="all">Otomatis Acak</option>
+        </select>
+
+        <label>Tanggal Transaksi:</label>
+        <input type="text" id="entry_tanggal">
+    </div>
+
+    <button class="btn-cetak" id="btnCetak" onclick="prosesTransaksi()">CETAK STRUK (80MM)</button>
+</div>
+
+<div class="modal-overlay" id="modalStruk">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Simulasi Cetak Struk</h3>
+            <button class="close-btn" onclick="tutupSimulasi()">×</button>
+        </div>
+        <div class="struk-area" id="strukOutput">
+            </div>
+    </div>
+</div>
+
+<script>
+    let bluetoothDevice = null;
+    let printerCharacteristic = null;
+    let dataTersimpan = { riwayat: {} };
+
+    // Database Pelanggan yang telah diperbarui sesuai tabel Excel
+    const dbPelanggan = {
+        "14515307098": { idpel: "424110083517", nama: "RUMDIN BALAI OBAT", daya: "P1/1300 VA" },
+        "14516287100": { idpel: "424100821797", nama: "PUSKESMAS SANGGENG", daya: "S1/4400 VA" },
+        "56253536546": { idpel: "424100774527", nama: "PUSKESMAS MANSINAM", daya: "P1/1300 VA" },
+        "14510802540": { idpel: "424230002019", nama: "P U S K E S M A S", daya: "S1/3500 VA" },
+        "45044658750": { idpel: "424230000747", nama: "P U S K E S M A S", daya: "S1/2200 VA" },
+        "86252365746": { idpel: "424200048598", nama: "PUSKESMAS PEMBANTU", daya: "S1/900 VA" },
+        "45020383704": { idpel: "424200110048", nama: "PUSKESMAS MASNI", daya: "S1/2200 VA" },
+        "32902140311": { idpel: "424200195473", nama: "P U S K E S M A S", daya: "S1/6600 VA" },
+        "14328640900": { idpel: "424200146638", nama: "G. PERTEMUAN PUSKESMAS", daya: "S1/5500 VA" },
+        "14508190809": { idpel: "424250004746", nama: "PUSKESMAS SP 7", daya: "S1/1300 VA" },
+        "14431361311": { idpel: "424100762939", nama: "RUANG OPERASI PUSKESMAS WOSI", daya: "S1/3500 VA" },
+        "45040449238": { idpel: "424200134095", nama: "DINAS KESEHATAN", daya: "S1/5500 VA" },
+        "86258516391": { idpel: "424330000296", nama: "PUSKESMAS WARKAPI", daya: "S1/5500 VA" },
+        "86258533263": { idpel: "424320004333", nama: "P U S K E S M A S", daya: "S1/1300 VA" },
+        "14550787098": { idpel: "424220005747", nama: "PUSKESMAS WARMARE", daya: "S1/1300 VA" },
+        "14516460566": { idpel: "424101085449", nama: "PUSKESMAS NUNI", daya: "S1/3500 VA" }
+    };
+
+    window.onload = function() {
+        initTanggalDropdown();
+        setWaktuAcak();
+    };
+
+    // Fungsi Inisialisasi Dropdown Tanggal
+    function initTanggalDropdown() {
+        const tglSelect = document.getElementById('combo_tanggal');
+        if (!tglSelect) return;
+        for(let i = 1; i <= 31; i++) {
+            tglSelect.innerHTML += `<option value="${i}">${i}</option>`;
+        }
+    }
+
+    // Fungsi Update Jumlah Hari Berdasarkan Bulan
+    function updateTanggal() {
+        const bln = document.getElementById('combo_bulan').value;
+        const tglSelect = document.getElementById('combo_tanggal');
+        const currentTgl = tglSelect.value;
+        
+        tglSelect.innerHTML = '<option value="all">Otomatis Acak</option>';
+        let maxDays = 31;
+        if (bln !== 'all') {
+            const year = new Date().getFullYear();
+            maxDays = new Date(year, parseInt(bln) + 1, 0).getDate();
+        }
+        for (let i = 1; i <= maxDays; i++) {
+            tglSelect.innerHTML += `<option value="${i}">${i}</option>`;
+        }
+        if (currentTgl !== 'all' && parseInt(currentTgl) <= maxDays) {
+            tglSelect.value = currentTgl;
+        }
+    }
+
+    function autoFillDariMeter() {
+        const meter = document.getElementById('entry_meter').value;
+        if (dbPelanggan[meter]) {
+            document.getElementById('combo_idpel').value = dbPelanggan[meter].idpel;
+            document.getElementById('entry_nama').value = dbPelanggan[meter].nama;
+            
+            if(dbPelanggan[meter].daya !== "") {
+                document.getElementById('combo_daya').value = dbPelanggan[meter].daya;
+            }
+        } else {
+            document.getElementById('combo_idpel').value = "";
+            document.getElementById('entry_nama').value = "";
+        }
+    }
+
+    // Fungsi Waktu Acak dengan Pilihan Dropdown Terintegrasi
+    function setWaktuAcak() {
+        const comboBulan = document.getElementById('combo_bulan');
+        const comboTanggal = document.getElementById('combo_tanggal');
+        
+        const pBulan = comboBulan ? comboBulan.value : 'all';
+        const pTanggal = comboTanggal ? comboTanggal.value : 'all';
+        
+        const end = new Date(); 
+        const year = end.getFullYear();
+        
+        let randomDate;
+        let isValid = false;
+        const liburNasional = ["1-1", "5-1", "8-17", "12-25"];
+
+        let iterasi = 0; // Proteksi infinite loop
+
+        while (!isValid && iterasi < 1000) {
+            iterasi++;
+            
+            // Tentukan Bulan
+            let bln = pBulan === 'all' ? Math.floor(Math.random() * (end.getMonth() + 1)) : parseInt(pBulan);
+            
+            // Tentukan Tanggal
+            let maxDays = new Date(year, bln + 1, 0).getDate();
+            let tgl = pTanggal === 'all' ? Math.floor(Math.random() * maxDays) + 1 : parseInt(pTanggal);
+            
+            // Batasi hari ini jika bulan berjalan
+            if (pBulan === 'all' && pTanggal === 'all' && bln === end.getMonth()) {
+                tgl = Math.floor(Math.random() * end.getDate()) + 1;
+            }
+
+            randomDate = new Date(year, bln, tgl);
+            const day = randomDate.getDay();
+            const dateStr = `${bln + 1}-${tgl}`;
+
+            // Validasi Hari Minggu / Libur Nasional
+            if (pBulan !== 'all' && pTanggal !== 'all') {
+                isValid = true; // Paksa input manual
+            } else if (pTanggal !== 'all') {
+                if (day !== 0 && !liburNasional.includes(dateStr)) isValid = true;
+            } else {
+                if (day !== 0 && !liburNasional.includes(dateStr)) isValid = true;
+            }
+        }
+
+        if (iterasi >= 1000) { randomDate = new Date(); }
+
+        // Acak Jam antara 8 dan 15
+        let jam = Math.floor(Math.random() * (15 - 8 + 1)) + 8;
+        let menit = 0;
+        let detik = Math.floor(Math.random() * 60);
+
+        if (jam === 8) {
+            menit = Math.floor(Math.random() * (59 - 15 + 1)) + 15; 
+        } else if (jam === 15) {
+            menit = Math.floor(Math.random() * (45 - 0 + 1)) + 0; 
+        } else {
+            menit = Math.floor(Math.random() * 60); 
+        }
+
+        const dd = String(randomDate.getDate()).padStart(2, '0');
+        const mm = String(randomDate.getMonth() + 1).padStart(2, '0');
+        const yyyy = randomDate.getFullYear();
+        const hh = String(jam).padStart(2, '0');
+        const min = String(menit).padStart(2, '0');
+        const ss = String(detik).padStart(2, '0');
+
+        document.getElementById('entry_tanggal').value = `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
+    }
+
+    function saveData() {
+        const idpel = document.getElementById('combo_idpel').value.trim();
+        if (idpel) {
+            dataTersimpan.riwayat[idpel] = {
+                kpc: document.getElementById('entry_kpc').value,
+                meter: document.getElementById('entry_meter').value,
+                nama: document.getElementById('entry_nama').value,
+                daya: document.getElementById('combo_daya').value
+            };
+            localStorage.setItem('config_pos', JSON.stringify(dataTersimpan));
+        }
+    }
+
+    // Hitung KWH berdasarkan tarif khusus
+    function hitungKWH(nominal, daya) {
+        let d = daya.toUpperCase();
+        
+        const tarifPapua1300_2200 = 500000 / 657.9; 
+        const rasioDiskon = tarifPapua1300_2200 / 1444.70; 
+
+        let tarif = tarifPapua1300_2200; 
+        
+        if (d.includes("450")) {
+            tarif = 415; 
+        } else if (d.includes("R1/900")) {
+            tarif = 605; 
+        } else if (d.includes("R1M/900")) {
+            tarif = 1352 * rasioDiskon;
+        } else if (d.includes("1300") || d.includes("2200")) {
+            tarif = tarifPapua1300_2200; 
+        } else if (d.includes("3500") || d.includes("4400") || d.includes("5500") || d.includes("6600")) {
+            tarif = 1699.53 * rasioDiskon; 
+        }
+        
+        let kwh = nominal / tarif;
+        return kwh.toFixed(1).replace(".", ",");
+    }
+
+    async function pindaiPrinter() {
+        if (!navigator.bluetooth) {
+            alert("Browser Anda tidak mendukung Web Bluetooth API. Pastikan akses via HTTPS atau localhost.");
+            return;
+        }
+        try {
+            document.getElementById('statusPrinter').style.display = 'block';
+            document.getElementById('statusPrinter').innerText = 'Status: Memindai...';
+            document.getElementById('statusPrinter').style.color = 'orange';
+
+            bluetoothDevice = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2']
+            });
+
+            const server = await bluetoothDevice.gatt.connect();
+            const services = await server.getPrimaryServices();
+            let foundCharacteristic = false;
+
+            for (const service of services) {
+                const characteristics = await service.getCharacteristics();
+                for (const characteristic of characteristics) {
+                    if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                        printerCharacteristic = characteristic;
+                        foundCharacteristic = true;
+                        break;
+                    }
+                }
+                if (foundCharacteristic) break;
+            }
+
+            if (printerCharacteristic) {
+                const namaPerangkat = bluetoothDevice.name || 'Printer Thermal';
+                document.getElementById('combo_port').innerHTML = `<option value="connected">${namaPerangkat}</option>`;
+                document.getElementById('statusPrinter').innerText = 'Status: Terhubung (' + namaPerangkat + ')';
+                document.getElementById('statusPrinter').style.color = 'green';
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+                alert(`Berhasil terhubung ke printer: ${namaPerangkat}`);
+            }
+        } catch (error) {
+            console.error(error);
+            document.getElementById('statusPrinter').innerText = 'Status: Koneksi Gagal';
+            document.getElementById('statusPrinter').style.color = 'red';
+        }
+    }
+
+    function onDisconnected() {
+        document.getElementById('statusPrinter').innerText = 'Status: Terputus!';
+        document.getElementById('statusPrinter').style.color = 'red';
+        document.getElementById('combo_port').innerHTML = `<option value="none">Printer Terputus...</option>`;
+        printerCharacteristic = null;
+    }
+
+    async function buildReceiptCanvas(htmlText, logoSrc, textPhone, textIG, printWidthDots = 576) {
+        const loadImage = (src) => new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = src;
+        });
+
+        const logoImg = await loadImage(logoSrc);
+        const phoneImg = await loadImage("phone.png");
+        const igImg = await loadImage("instagram.png");
+
+        const lines = htmlText.split('\n');
+        const fontSize = 23; 
+        const lineHeight = 32;
+
+        let totalHeight = 10; 
+        let logoWidth = 185; 
+        let logoHeight = 0;
+        
+        if (logoImg) {
+            logoHeight = Math.floor((logoWidth / logoImg.width) * logoImg.height);
+            totalHeight += logoHeight + 20; 
+        }
+        
+        totalHeight += (lines.length * lineHeight); 
+        totalHeight += 95; 
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        canvas.width = Math.floor(printWidthDots / 8) * 8;
+        canvas.height = totalHeight;
+
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        let currentY = 10;
+
+        if (logoImg) {
+            const logoX = (canvas.width - logoWidth) / 2;
+            ctx.drawImage(logoImg, logoX, currentY, logoWidth, logoHeight);
+            currentY += logoHeight + 20;
+        }
+
+        ctx.textBaseline = "top";
+        ctx.textAlign = "left";
+        for (let line of lines) {
+            let isBold = line.includes('<span class="bold-text">');
+            let cleanLine = line.replace(/<[^>]*>?/gm, ''); 
+
+            if (isBold) {
+                ctx.font = `bold ${fontSize}px 'Courier New', Courier, monospace`;
+            } else {
+                ctx.font = `${fontSize}px 'Courier New', Courier, monospace`;
+            }
+            ctx.fillStyle = "black";
+            ctx.fillText(cleanLine, 12, currentY); 
+            currentY += lineHeight;
+        }
+
+        const margin = 10; 
+        const iconSize = 24;
+        const gap = 6; 
+        
+        ctx.textBaseline = "middle";
+        const footerMidY = currentY + (iconSize / 2);
+        const footerFont = `22px 'Courier New', Courier, monospace`;
+
+        ctx.textAlign = "left";
+        ctx.font = footerFont;
+        if (phoneImg) {
+            ctx.drawImage(phoneImg, margin, currentY, iconSize, iconSize);
+            ctx.fillText(textPhone, margin + iconSize + gap, footerMidY);
+        } else {
+            ctx.fillText("📞 " + textPhone, margin, footerMidY);
+        }
+
+        ctx.textAlign = "right";
+        if (igImg) {
+            const textWidth = ctx.measureText(textIG).width;
+            const iconX = canvas.width - margin - textWidth - gap - iconSize;
+            ctx.drawImage(igImg, iconX, currentY, iconSize, iconSize);
+            ctx.fillText(textIG + " ", canvas.width - margin, footerMidY);
+        } else {
+            ctx.fillText("IG:" + textIG + " ", canvas.width - margin, footerMidY);
+        }
+
+        return canvas;
+    }
+
+    function sliceCanvasForPrinter(canvas) {
+        const ctx = canvas.getContext('2d');
+        const MAX_SLICE_HEIGHT = 200; 
+        const slices = [];
+        
+        for (let sliceY = 0; sliceY < canvas.height; sliceY += MAX_SLICE_HEIGHT) {
+            const sliceHeight = Math.min(MAX_SLICE_HEIGHT, canvas.height - sliceY);
+            const imgData = ctx.getImageData(0, sliceY, canvas.width, sliceHeight).data;
+            
+            const xL = (canvas.width / 8) % 256;
+            const xH = Math.floor((canvas.width / 8) / 256);
+            const yL = sliceHeight % 256;
+            const yH = Math.floor(sliceHeight / 256);
+
+            const data = [];
+            data.push(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH); 
+
+            for (let y = 0; y < sliceHeight; y++) {
+                for (let x = 0; x < canvas.width; x += 8) {
+                    let byte = 0;
+                    for (let bit = 0; bit < 8; bit++) {
+                        const idx = ((y * canvas.width) + x + bit) * 4;
+                        const r = imgData[idx];
+                        const g = imgData[idx + 1];
+                        const b = imgData[idx + 2];
+                        const alpha = imgData[idx + 3];
+
+                        const grayscale = (r * 0.299 + g * 0.587 + b * 0.114);
+                        if (grayscale < 128 && alpha > 128) {
+                            byte |= (1 << (7 - bit));
+                        }
+                    }
+                    data.push(byte);
+                }
+            }
+            slices.push(new Uint8Array(data));
+        }
+        
+        return slices;
+    }
+
+    async function kirimKePrinterAsli(canvas) {
+        if (!printerCharacteristic) return false;
+
+        try {
+            const imageChunks = sliceCanvasForPrinter(canvas);
+            
+            const initCmd = new Uint8Array([0x1B, 0x40]); 
+            const alignLeftCmd = new Uint8Array([0x1B, 0x61, 0x00]); 
+            const lineFeedCmd = new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A, 0x0A]); 
+            
+            let totalLength = initCmd.length + alignLeftCmd.length;
+            for (const chunk of imageChunks) totalLength += chunk.length;
+            totalLength += lineFeedCmd.length;
+            
+            const payload = new Uint8Array(totalLength);
+            
+            let offset = 0;
+            payload.set(initCmd, offset); offset += initCmd.length;
+            payload.set(alignLeftCmd, offset); offset += alignLeftCmd.length;
+            
+            for (const chunk of imageChunks) {
+                payload.set(chunk, offset); offset += chunk.length;
+            }
+            
+            payload.set(lineFeedCmd, offset);
+
+            const CHUNK_SIZE = 256; 
+            for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
+                const chunk = payload.slice(i, i + CHUNK_SIZE);
+                if (printerCharacteristic.properties.writeWithoutResponse) {
+                    await printerCharacteristic.writeValueWithoutResponse(chunk);
+                } else {
+                    await printerCharacteristic.writeValue(chunk);
+                }
+                await new Promise(r => setTimeout(r, 40)); 
+            }
+            return true;
+        } catch (error) {
+            console.error(error);
+            alert("Terjadi kesalahan: " + error.message);
+            return false;
+        }
+    }
+
+    function buatTokenAcak() {
+        let token = "";
+        for (let i = 0; i < 20; i++) token += Math.floor(Math.random() * 10).toString();
+        return `${token.substring(0,4)} ${token.substring(4,8)} ${token.substring(8,12)} ${token.substring(12,16)} ${token.substring(16,20)}`;
+    }
+
+    function formatRp(angka, tambahKoma = false) {
+        let hasil = parseInt(angka).toLocaleString('id-ID');
+        if (tambahKoma) hasil += ",00";
+        return hasil;
+    }
+
+    function centerText(text, width = 42) {
+        if (text.length >= width) return text;
+        const pad = Math.floor((width - text.length) / 2);
+        return " ".repeat(pad) + text;
+    }
+
+    function padLeft(text, width) {
+        return String(text).padStart(width, ' ');
+    }
+
+    async function prosesTransaksi() {
+        saveData();
+
+        const kpc = document.getElementById('entry_kpc').value;
+        const meter = document.getElementById('entry_meter').value;
+        
+        if (!meter) {
+            alert("Silakan pilih No. Meter terlebih dahulu!");
+            return;
+        }
+        
+        const idpel = document.getElementById('combo_idpel').value;
+        const nama = document.getElementById('entry_nama').value;
+        
+        let dayaRaw = document.getElementById('combo_daya').value;
+        const daya = dayaRaw.split(" ")[0] + " VA"; 
+
+        const nominalStroom = parseInt(document.getElementById('combo_nominal').value);
+        const adminPos = parseInt(document.getElementById('combo_admin').value);
+        const strTanggal = document.getElementById('entry_tanggal').value;
+
+        const rpBayar = nominalStroom + adminPos;
+        
+        let jmlKwh = hitungKWH(nominalStroom, dayaRaw);
+
+        // --- PENYESUAIAN NO RESI DAN PETUGAS OTOMATIS BERDASARKAN KPC ---
+        let prefixResi = "98356-21"; 
+        let petugas = "734026831";   
+
+        if (kpc === "Kpc. Manokwari Sanggeng 98312A") {
+            prefixResi = "98312A-09";
+            petugas = "5500593388"; 
+        } else if (kpc === "Kpc Prafi 98356") {
+            prefixResi = "98356-21";
+            petugas = "734026831";
+        }
+
+        const resi = `${prefixResi}/${new Date().getFullYear()}/${Math.floor(Math.random() * 900000) + 100000}`;
+        // ----------------------------------------------------------------
+
+        const noRef = `1098356069${petugas}99${Math.floor(Math.random() * 900000000) + 100000000}`;
+        const token = buatTokenAcak();
+
+        await cetakKePrinter(kpc, meter, idpel, nama, daya, nominalStroom, adminPos, rpBayar, jmlKwh, strTanggal, resi, petugas, noRef, token);
+    }
+
+    async function cetakKePrinter(kpc, meter, idpel, nama, daya, stroom, admin, bayar, kwh, tanggal, resi, petugas, noRef, token) {
+        const fBayar = formatRp(bayar);
+        const fStroom = formatRp(stroom, true);
+        const fAdmin = formatRp(admin);
+
+        let strukBaseTeks = 
+            centerText("PT POS INDONESIA (PERSERO)") + "\n" +
+            centerText(kpc) + "\n\n" +
+            `<span class="bold-text">` + centerText("TANDA TERIMA") + `</span>\n` +
+            `<span class="bold-text">` + centerText("TAGIHAN PLN PREPAID") + `</span>\n` +
+            "------------------------------------------\n" +
+            `Tanggal   : ${tanggal}\n` +
+            `No. Resi  : ${resi}\n` +
+            `Petugas   : ${petugas}\n` +
+            "------------------------------------------\n" +
+            centerText("STRUK PEMBELIAN LISTRIK PRABAYAR") + "\n" +
+            `NO METER       : ${meter}\n` +
+            `IDPEL          : ${idpel}\n` +
+            `NAMA           : ${nama.toUpperCase()}\n` +
+            `TARIF/DAYA     : ${daya}\n` +
+            `NO REF         : \n` +
+            `${noRef}\n` +
+            `RP BAYAR       : RP. ${padLeft(fBayar, 14)}\n` +
+            `METERAI        : RP.              0,00\n` +
+            `PPN            : RP.              0,00\n` +
+            `PBJT-TL        : RP.              0,00\n` +
+            `ANGSURAN       : RP.              0,00\n` +
+            `RP STROOM/TOKEN: RP.    ${padLeft(fStroom, 14)}\n` +
+            `JML KWH        :     ${padLeft(kwh, 14)}\n` +
+            `ADMIN POS      : RP. ${padLeft(fAdmin, 14)}\n` +
+            `<span class="bold-text">STROOM / TOKEN : ${token}</span>\n\n` +
+            centerText("POS IND") + "\n" +
+            centerText("Info Hubungi Call Center 123 Atau") + "\n" +
+            centerText("hubungi PLN Terdekat") + "\n" +
+            centerText("Download PLN Mobile") + "\n" +
+            "NPWP : 01.001.620.2-093.000 a.n PT Pos\n" +
+            "Indonesia\n" +
+            "------------------------------------------\n" +
+            centerText("Simpan resi ini sbg bukti pembayaran sah.") + "\n" +
+            centerText("Kami sangat menghargai privasi Bp/Ibu.") + "\n" +
+            centerText("Informasi data pribadi yang diberikan") + "\n" +
+            centerText("hanya diproses untuk penyelenggaraan") + "\n" +
+            centerText("layanan yg Bp/Ibu gunakan. Data Pribadi") + "\n" +
+            centerText("yang disertakan dalam transaksi ini") + "\n" +
+            centerText("diproses sesuai dgn kebijakan privasi") + "\n" +
+            centerText("yang berlaku dan dapat diakses pada") + "\n\n" +
+            `<span class="bold-text">` + centerText("www.posindonesia.co.id") + `</span>\n\n` +
+            centerText("Terima kasih telah memilih kami,") + "\n" +
+            centerText("Sampai jumpa di transaksi berikutnya...") + "\n\n" +
+            centerText("Untuk informasi hubungi"); 
+
+        const logoURL = "logo.png"; 
+        
+        const canvas = await buildReceiptCanvas(strukBaseTeks, logoURL, "Halo Pos 1500161", " @posindonesia.ig", 576);
+        const dataUrl = canvas.toDataURL("image/png");
+
+        document.getElementById('strukOutput').innerHTML = `<img src="${dataUrl}" class="struk-img-preview" alt="Struk Real">`;
+        document.getElementById('modalStruk').style.display = 'flex';
+
+        if (printerCharacteristic) {
+            const btn = document.getElementById('btnCetak');
+            btn.innerText = "SEDANG MENCETAK (MOHON TUNGGU)...";
+            btn.disabled = true;
+
+            await kirimKePrinterAsli(canvas);
+            
+            btn.innerText = "CETAK STRUK (80MM)";
+            btn.disabled = false;
+        }
+    }
+
+    function tutupSimulasi() {
+        document.getElementById('modalStruk').style.display = 'none';
+        setWaktuAcak(); // Diacak kembali saat struk ditutup
+    }
+</script>
+
+</body>
+</html>
